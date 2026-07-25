@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { getClient, getContractAddress, ensureCorrectChain } from "@/lib/genlayer-client";
+import { getClient, getContractAddress } from "@/lib/genlayer-client";
 import { Toaster, toast } from "sonner";
 import { User, X, Loader2, Sparkles } from "lucide-react";
 
@@ -29,7 +29,10 @@ export function RegisterPopup({ address, onRegistered, onClose }: RegisterPopupP
 
     setIsRegistering(true);
     try {
-      await ensureCorrectChain();
+      // Request accounts first to ensure wallet is connected
+      if (window.ethereum) {
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+      }
 
       const client = getClient(address as `0x${string}`);
       const contractAddress = getContractAddress();
@@ -51,7 +54,12 @@ export function RegisterPopup({ address, onRegistered, onClose }: RegisterPopupP
       onRegistered();
     } catch (error: any) {
       console.error("Failed to register:", error);
-      toast.error(error.message || "Failed to register");
+      // Show more helpful error message
+      if (error.message?.includes("not been authorized")) {
+        toast.error("Transaction rejected. Please approve in your wallet.");
+      } else {
+        toast.error(error.message || "Failed to register");
+      }
     } finally {
       setIsRegistering(false);
     }

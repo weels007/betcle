@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { getClient, getContractAddress, ensureCorrectChain } from "@/lib/genlayer-client";
+import { getClient, getContractAddress } from "@/lib/genlayer-client";
 import { useWallet } from "@/lib/WalletContext";
 import { Toaster, toast } from "sonner";
 import { Plus, Link as LinkIcon, Calendar, Tag, Sparkles, ArrowRight, Wallet } from "lucide-react";
@@ -47,8 +47,6 @@ export default function CreatePage() {
 
     setIsSubmitting(true);
     try {
-      await ensureCorrectChain();
-
       const client = getClient(address as `0x${string}`);
       const contractAddress = getContractAddress();
 

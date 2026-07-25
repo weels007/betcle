@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getClient, getContractAddress, ensureCorrectChain } from "@/lib/genlayer-client";
+import { getClient, getContractAddress } from "@/lib/genlayer-client";
 import { useWallet } from "@/lib/WalletContext";
 import { Toaster, toast } from "sonner";
 import {
@@ -96,8 +96,6 @@ export default function InstantResolvePage() {
 
     setResolvingId(predictionId);
     try {
-      await ensureCorrectChain();
-
       const client = getClient(address as `0x${string}`);
       const contractAddress = getContractAddress();
 

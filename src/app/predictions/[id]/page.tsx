@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { getClient, getContractAddress, ensureCorrectChain } from "@/lib/genlayer-client";
+import { getClient, getContractAddress } from "@/lib/genlayer-client";
 import { useWallet } from "@/lib/WalletContext";
 import { Toaster, toast } from "sonner";
 import {
@@ -131,8 +131,6 @@ export default function PredictionDetailPage({
 
     setIsBetting(true);
     try {
-      await ensureCorrectChain();
-
       const client = getClient(address as `0x${string}`);
       const contractAddress = getContractAddress();
 
@@ -170,8 +168,6 @@ export default function PredictionDetailPage({
 
     setIsResolving(true);
     try {
-      await ensureCorrectChain();
-
       const client = getClient(address as `0x${string}`);
       const contractAddress = getContractAddress();
 
@@ -210,8 +206,6 @@ export default function PredictionDetailPage({
 
     setIsClaiming(true);
     try {
-      await ensureCorrectChain();
-
       const client = getClient(address as `0x${string}`);
       const contractAddress = getContractAddress();
 
