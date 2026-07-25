@@ -27,13 +27,27 @@ export function useWallet() {
   return useContext(WalletContext);
 }
 
+function hasMultipleWallets(): boolean {
+  if (typeof window === "undefined") return false;
+  
+  // Check for providers array
+  if (window.ethereum?.providers?.length > 1) return true;
+  
+  // Check if Rabby is installed alongside MetaMask
+  if (window.rabby && window.ethereum?.isMetaMask) return true;
+  
+  // Check if Coinbase is installed alongside MetaMask
+  if (window.ethereum?.isCoinbaseWallet && window.ethereum?.isMetaMask) return true;
+  
+  return false;
+}
+
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [address, setAddress] = useState<string | null>(null);
   const [userInfo, setUserInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showRegisterPopup, setShowRegisterPopup] = useState(false);
   const [showWalletSelector, setShowWalletSelector] = useState(false);
-  const [pendingConnect, setPendingConnect] = useState(false);
 
   const loadUserData = useCallback(async (addr: string) => {
     try {
@@ -121,15 +135,13 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
-    // Check for ethereum provider
     if (!window.ethereum) {
       alert("Please install an EVM wallet like MetaMask, Rabby, or Coinbase Wallet");
       return false;
     }
 
-    // If multiple providers, show selector
-    const providers = window.ethereum.providers;
-    if (providers && providers.length > 1) {
+    // Always show selector if multiple wallets detected
+    if (hasMultipleWallets()) {
       setShowWalletSelector(true);
       return false;
     }
@@ -140,9 +152,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const handleWalletSelect = useCallback(async (provider: any) => {
     setShowWalletSelector(false);
-    setPendingConnect(true);
     await connectWithProvider(provider);
-    setPendingConnect(false);
   }, [connectWithProvider]);
 
   useEffect(() => {

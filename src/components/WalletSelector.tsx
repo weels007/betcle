@@ -25,36 +25,50 @@ function getAvailableWallets(): WalletOption[] {
   if (typeof window === "undefined") return [];
 
   const wallets: WalletOption[] = [];
+  const seen = new Set<string>();
 
-  // Check for multiple providers (EIP-6963 or array)
+  // Check window.ethereum.providers array (EIP-6963 or multi-wallet)
   if (window.ethereum?.providers?.length) {
-    // Multiple providers detected
     for (const provider of window.ethereum.providers) {
-      if (provider.isMetaMask) {
+      if (provider.isMetaMask && !seen.has("MetaMask")) {
         wallets.push({ name: "MetaMask", icon: "🦊", provider });
-      } else if (provider.isRabby) {
+        seen.add("MetaMask");
+      } else if (provider.isRabby && !seen.has("Rabby")) {
         wallets.push({ name: "Rabby", icon: "🐰", provider });
-      } else {
-        wallets.push({ name: "Wallet", icon: "💳", provider });
+        seen.add("Rabby");
+      } else if (provider.isCoinbaseWallet && !seen.has("Coinbase")) {
+        wallets.push({ name: "Coinbase Wallet", icon: "🔵", provider });
+        seen.add("Coinbase");
       }
     }
-  } else if (window.ethereum) {
-    // Single provider
-    if (window.ethereum.isMetaMask) {
+  }
+
+  // Check main window.ethereum
+  if (window.ethereum) {
+    if (window.ethereum.isMetaMask && !seen.has("MetaMask")) {
       wallets.push({ name: "MetaMask", icon: "🦊", provider: window.ethereum });
-    } else {
+      seen.add("MetaMask");
+    } else if (window.ethereum.isRabby && !seen.has("Rabby")) {
+      wallets.push({ name: "Rabby", icon: "🐰", provider: window.ethereum });
+      seen.add("Rabby");
+    } else if (window.ethereum.isCoinbaseWallet && !seen.has("Coinbase")) {
+      wallets.push({ name: "Coinbase Wallet", icon: "🔵", provider: window.ethereum });
+      seen.add("Coinbase");
+    } else if (!seen.has("Browser Wallet")) {
       wallets.push({ name: "Browser Wallet", icon: "💳", provider: window.ethereum });
+      seen.add("Browser Wallet");
     }
   }
 
-  // Check for Rabby specifically (sometimes injected separately)
-  if (window.rabby && !wallets.find(w => w.name === "Rabby")) {
+  // Check Rabby separately (sometimes injected as window.rabby)
+  if (window.rabby && !seen.has("Rabby")) {
     wallets.push({ name: "Rabby", icon: "🐰", provider: window.rabby });
+    seen.add("Rabby");
   }
 
-  // Check for Coinbase Wallet
-  if (window.ethereum?.isCoinbaseWallet && !wallets.find(w => w.name === "Coinbase")) {
-    wallets.push({ name: "Coinbase Wallet", icon: "🔵", provider: window.ethereum });
+  // If only MetaMask detected, still show it
+  if (wallets.length === 0 && window.ethereum) {
+    wallets.push({ name: "MetaMask", icon: "🦊", provider: window.ethereum });
   }
 
   return wallets;
