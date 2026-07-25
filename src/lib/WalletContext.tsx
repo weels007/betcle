@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import { getClient, getContractAddress } from "@/lib/genlayer-client";
 import { RegisterPopup } from "@/components/RegisterPopup";
+import { WalletSelector } from "@/components/WalletSelector";
 
 interface WalletContextType {
   address: string | null;
@@ -31,6 +32,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [userInfo, setUserInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showRegisterPopup, setShowRegisterPopup] = useState(false);
+  const [showWalletSelector, setShowWalletSelector] = useState(false);
+  const [pendingConnect, setPendingConnect] = useState(false);
 
   const loadUserData = useCallback(async (addr: string) => {
     try {
@@ -70,34 +73,23 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, [address, loadUserData]);
 
-  const connectWallet = useCallback(async (): Promise<boolean> => {
-    if (typeof window === "undefined") {
-      alert("Please open in a browser with a wallet extension");
-      return false;
-    }
-
-    // Check for ethereum provider
-    if (!window.ethereum) {
-      alert("Please install an EVM wallet like MetaMask, Rabby, or Coinbase Wallet");
-      return false;
-    }
-
+  const connectWithProvider = useCallback(async (provider: any): Promise<boolean> => {
     try {
-      const accounts = await window.ethereum.request({
+      const accounts = await provider.request({
         method: "eth_requestAccounts",
       });
       setAddress(accounts[0]);
 
       // Switch to Studionet
       try {
-        await window.ethereum.request({
+        await provider.request({
           method: "wallet_switchEthereumChain",
           params: [{ chainId: "0xF22F" }],
         });
       } catch (switchError: any) {
         if (switchError.code === 4902) {
           try {
-            await window.ethereum.request({
+            await provider.request({
               method: "wallet_addEthereumChain",
               params: [
                 {
@@ -122,6 +114,36 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       return false;
     }
   }, [loadUserData]);
+
+  const connectWallet = useCallback(async (): Promise<boolean> => {
+    if (typeof window === "undefined") {
+      alert("Please open in a browser with a wallet extension");
+      return false;
+    }
+
+    // Check for ethereum provider
+    if (!window.ethereum) {
+      alert("Please install an EVM wallet like MetaMask, Rabby, or Coinbase Wallet");
+      return false;
+    }
+
+    // If multiple providers, show selector
+    const providers = window.ethereum.providers;
+    if (providers && providers.length > 1) {
+      setShowWalletSelector(true);
+      return false;
+    }
+
+    // Single provider, connect directly
+    return connectWithProvider(window.ethereum);
+  }, [connectWithProvider]);
+
+  const handleWalletSelect = useCallback(async (provider: any) => {
+    setShowWalletSelector(false);
+    setPendingConnect(true);
+    await connectWithProvider(provider);
+    setPendingConnect(false);
+  }, [connectWithProvider]);
 
   useEffect(() => {
     const checkExistingWallet = async () => {
@@ -152,6 +174,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   return (
     <WalletContext.Provider value={{ address, userInfo, isRegistered, loading, connectWallet, refreshUserData }}>
       {children}
+      {showWalletSelector && (
+        <WalletSelector
+          onSelect={handleWalletSelect}
+          onClose={() => setShowWalletSelector(false)}
+        />
+      )}
       {showRegisterPopup && address && (
         <RegisterPopup
           address={address}
