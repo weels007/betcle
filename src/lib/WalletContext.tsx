@@ -7,6 +7,7 @@ import { WalletSelector } from "@/components/WalletSelector";
 
 interface WalletContextType {
   address: string | null;
+  provider: any | null;
   userInfo: any | null;
   isRegistered: boolean;
   loading: boolean;
@@ -17,6 +18,7 @@ interface WalletContextType {
 
 const WalletContext = createContext<WalletContextType>({
   address: null,
+  provider: null,
   userInfo: null,
   isRegistered: false,
   loading: true,
@@ -31,21 +33,14 @@ export function useWallet() {
 
 function hasMultipleWallets(): boolean {
   if (typeof window === "undefined") return false;
-  
-  // Check for providers array
   if (window.ethereum?.providers?.length > 1) return true;
-  
-  // Check if Rabby is installed alongside MetaMask
   if (window.rabby && window.ethereum?.isMetaMask) return true;
-  
-  // Check if Coinbase is installed alongside MetaMask
-  if (window.ethereum?.isCoinbaseWallet && window.ethereum?.isMetaMask) return true;
-  
   return false;
 }
 
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [address, setAddress] = useState<string | null>(null);
+  const [provider, setProvider] = useState<any | null>(null);
   const [userInfo, setUserInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showRegisterPopup, setShowRegisterPopup] = useState(false);
@@ -89,29 +84,24 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     }
   }, [address, loadUserData]);
 
-  const disconnectWallet = useCallback(() => {
-    setAddress(null);
-    setUserInfo(null);
-    setShowRegisterPopup(false);
-  }, []);
-
-  const connectWithProvider = useCallback(async (provider: any): Promise<boolean> => {
+  const connectWithProvider = useCallback(async (selectedProvider: any): Promise<boolean> => {
     try {
-      const accounts = await provider.request({
+      const accounts = await selectedProvider.request({
         method: "eth_requestAccounts",
       });
       setAddress(accounts[0]);
+      setProvider(selectedProvider);
 
       // Switch to Studionet
       try {
-        await provider.request({
+        await selectedProvider.request({
           method: "wallet_switchEthereumChain",
           params: [{ chainId: "0xF22F" }],
         });
       } catch (switchError: any) {
         if (switchError.code === 4902) {
           try {
-            await provider.request({
+            await selectedProvider.request({
               method: "wallet_addEthereumChain",
               params: [
                 {
@@ -148,20 +138,25 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
-    // Always show selector if multiple wallets detected
     if (hasMultipleWallets()) {
       setShowWalletSelector(true);
       return false;
     }
 
-    // Single provider, connect directly
     return connectWithProvider(window.ethereum);
   }, [connectWithProvider]);
 
-  const handleWalletSelect = useCallback(async (provider: any) => {
+  const handleWalletSelect = useCallback(async (selectedProvider: any) => {
     setShowWalletSelector(false);
-    await connectWithProvider(provider);
+    await connectWithProvider(selectedProvider);
   }, [connectWithProvider]);
+
+  const disconnectWallet = useCallback(() => {
+    setAddress(null);
+    setProvider(null);
+    setUserInfo(null);
+    setShowRegisterPopup(false);
+  }, []);
 
   useEffect(() => {
     const checkExistingWallet = async () => {
@@ -174,6 +169,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         const accounts = await window.ethereum.request({ method: "eth_accounts" });
         if (accounts.length > 0) {
           setAddress(accounts[0]);
+          setProvider(window.ethereum);
           await loadUserData(accounts[0]);
         } else {
           setLoading(false);
@@ -190,7 +186,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const isRegistered = userInfo !== null;
 
   return (
-    <WalletContext.Provider value={{ address, userInfo, isRegistered, loading, connectWallet, disconnectWallet, refreshUserData }}>
+    <WalletContext.Provider value={{ address, provider, userInfo, isRegistered, loading, connectWallet, disconnectWallet, refreshUserData }}>
       {children}
       {showWalletSelector && (
         <WalletSelector
@@ -201,6 +197,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       {showRegisterPopup && address && (
         <RegisterPopup
           address={address}
+          provider={provider}
           onRegistered={() => {
             setShowRegisterPopup(false);
             loadUserData(address);
