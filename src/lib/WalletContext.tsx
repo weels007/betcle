@@ -197,7 +197,6 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       {showRegisterPopup && address && (
         <RegisterPopup
           address={address}
-          provider={provider}
           onRegistered={() => {
             setShowRegisterPopup(false);
             loadUserData(address);
