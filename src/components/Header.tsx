@@ -19,7 +19,7 @@ const navItems = [
 export function Header() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const { address, connectWallet, loading } = useWallet();
+  const { address, connectWallet, disconnectWallet, loading } = useWallet();
   const [isConnecting, setIsConnecting] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -100,6 +100,13 @@ export function Header() {
                     <Copy className="w-4 h-4 group-hover:text-teal-400 transition-colors" />
                   )}
                   <span className="hidden sm:inline font-mono">{formatAddress(address)}</span>
+                </button>
+                <button
+                  onClick={disconnectWallet}
+                  className="p-2.5 rounded-xl text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-all duration-300"
+                  title="Disconnect"
+                >
+                  <LogOut className="w-4 h-4" />
                 </button>
               </div>
             ) : (

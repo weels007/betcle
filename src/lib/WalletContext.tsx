@@ -11,6 +11,7 @@ interface WalletContextType {
   isRegistered: boolean;
   loading: boolean;
   connectWallet: () => Promise<boolean>;
+  disconnectWallet: () => void;
   refreshUserData: () => Promise<void>;
 }
 
@@ -20,6 +21,7 @@ const WalletContext = createContext<WalletContextType>({
   isRegistered: false,
   loading: true,
   connectWallet: async () => false,
+  disconnectWallet: () => {},
   refreshUserData: async () => {},
 });
 
@@ -86,6 +88,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       await loadUserData(address);
     }
   }, [address, loadUserData]);
+
+  const disconnectWallet = useCallback(() => {
+    setAddress(null);
+    setUserInfo(null);
+    setShowRegisterPopup(false);
+  }, []);
 
   const connectWithProvider = useCallback(async (provider: any): Promise<boolean> => {
     try {
@@ -182,7 +190,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const isRegistered = userInfo !== null;
 
   return (
-    <WalletContext.Provider value={{ address, userInfo, isRegistered, loading, connectWallet, refreshUserData }}>
+    <WalletContext.Provider value={{ address, userInfo, isRegistered, loading, connectWallet, disconnectWallet, refreshUserData }}>
       {children}
       {showWalletSelector && (
         <WalletSelector
