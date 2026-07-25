@@ -3,19 +3,45 @@ import { studionet } from "genlayer-js/chains";
 
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
 
+const RPC = "https://studio.genlayer.com/api";
+const STUDIONET_HEX = "0xf22f"; // 61999
+
 let clientInstance: ReturnType<typeof createClient> | null = null;
 
-export function getClient(address?: `0x${string}`) {
-  if (clientInstance && !address) {
+export function getClient(address?: `0x${string}`, provider?: any) {
+  if (!address && clientInstance) {
     return clientInstance;
   }
+
+  // Wrap provider to force legacy gasPrice=0 for zero-fee network
+  const wrappedProvider = provider ? wrapProvider(provider) : undefined;
 
   clientInstance = createClient({
     chain: studionet,
     account: address,
+    ...(wrappedProvider && { provider: wrappedProvider }),
   });
 
   return clientInstance;
+}
+
+function wrapProvider(provider: any) {
+  if (!provider || provider.__glPatched) return provider;
+  const orig = provider.request.bind(provider);
+  provider.request = async (req: any) => {
+    if (req?.method === "eth_sendTransaction" && Array.isArray(req.params) && req.params[0]) {
+      const tx = { ...req.params[0] };
+      tx.type = "0x0";
+      tx.gasPrice = "0x0";
+      delete tx.maxFeePerGas;
+      delete tx.maxPriorityFeePerGas;
+      if (!tx.gas) tx.gas = "0x100000";
+      return orig({ method: "eth_sendTransaction", params: [tx] });
+    }
+    return orig(req);
+  };
+  provider.__glPatched = true;
+  return provider;
 }
 
 export function getContractAddress() {
@@ -25,48 +51,7 @@ export function getContractAddress() {
 export const CHAIN_CONFIG = {
   chainId: 61999,
   name: "Studionet",
-  rpcUrl: "https://studio.genlayer.com/api",
+  rpcUrl: RPC,
   currency: "GEN",
   explorerUrl: "https://explorer-studio.genlayer.com",
 };
-
-export async function ensureCorrectChain() {
-  if (typeof window === "undefined" || !window.ethereum) return;
-
-  try {
-    const chainId = await window.ethereum.request({ method: "eth_chainId" });
-    const currentChainId = parseInt(chainId, 16);
-
-    if (currentChainId !== CHAIN_CONFIG.chainId) {
-      try {
-        await window.ethereum.request({
-          method: "wallet_switchEthereumChain",
-          params: [{ chainId: `0x${CHAIN_CONFIG.chainId.toString(16)}` }],
-        });
-      } catch (switchError: any) {
-        if (switchError.code === 4902) {
-          try {
-            await window.ethereum.request({
-              method: "wallet_addEthereumChain",
-              params: [
-                {
-                  chainId: `0x${CHAIN_CONFIG.chainId.toString(16)}`,
-                  chainName: "Studionet",
-                  nativeCurrency: { name: "GEN", symbol: "GEN", decimals: 18 },
-                  rpcUrls: [CHAIN_CONFIG.rpcUrl],
-                  blockExplorerUrls: [CHAIN_CONFIG.explorerUrl],
-                },
-              ],
-            });
-          } catch (addError: any) {
-            console.log("Network exists or wallet doesn't support adding chains");
-          }
-        } else {
-          console.log("Chain switch cancelled or failed");
-        }
-      }
-    }
-  } catch (error) {
-    console.error("Error checking chain:", error);
-  }
-}

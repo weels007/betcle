@@ -31,7 +31,7 @@ interface Prediction {
 }
 
 export default function InstantResolvePage() {
-  const { address, connectWallet } = useWallet();
+  const { address, provider, connectWallet } = useWallet();
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(true);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
@@ -96,7 +96,7 @@ export default function InstantResolvePage() {
 
     setResolvingId(predictionId);
     try {
-      const client = getClient(address as `0x${string}`);
+      const client = getClient(address as `0x${string}`, provider);
       const contractAddress = getContractAddress();
 
       toast.info("Resolving prediction with AI...");

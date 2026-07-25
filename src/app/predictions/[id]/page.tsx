@@ -42,7 +42,7 @@ export default function PredictionDetailPage({
 }) {
   const { id } = params;
   const router = useRouter();
-  const { address, connectWallet } = useWallet();
+  const { address, provider, connectWallet } = useWallet();
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [loading, setLoading] = useState(true);
   const [betAmount, setBetAmount] = useState("");
@@ -131,7 +131,7 @@ export default function PredictionDetailPage({
 
     setIsBetting(true);
     try {
-      const client = getClient(address as `0x${string}`);
+      const client = getClient(address as `0x${string}`, provider);
       const contractAddress = getContractAddress();
 
       const txHash = await client.writeContract({
@@ -168,7 +168,7 @@ export default function PredictionDetailPage({
 
     setIsResolving(true);
     try {
-      const client = getClient(address as `0x${string}`);
+      const client = getClient(address as `0x${string}`, provider);
       const contractAddress = getContractAddress();
 
       const txHash = await client.writeContract({
@@ -206,7 +206,7 @@ export default function PredictionDetailPage({
 
     setIsClaiming(true);
     try {
-      const client = getClient(address as `0x${string}`);
+      const client = getClient(address as `0x${string}`, provider);
       const contractAddress = getContractAddress();
 
       const txHash = await client.writeContract({

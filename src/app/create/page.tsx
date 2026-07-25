@@ -19,7 +19,7 @@ const categories = [
 
 export default function CreatePage() {
   const router = useRouter();
-  const { address, connectWallet } = useWallet();
+  const { address, provider, connectWallet } = useWallet();
   const [question, setQuestion] = useState("");
   const [category, setCategory] = useState("crypto");
   const [resolutionUrl, setResolutionUrl] = useState("");
@@ -47,7 +47,7 @@ export default function CreatePage() {
 
     setIsSubmitting(true);
     try {
-      const client = getClient(address as `0x${string}`);
+      const client = getClient(address as `0x${string}`, provider);
       const contractAddress = getContractAddress();
 
       if (!contractAddress) {

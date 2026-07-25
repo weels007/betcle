@@ -1,26 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { getContractAddress } from "@/lib/genlayer-client";
+import { getClient, getContractAddress } from "@/lib/genlayer-client";
+import { useWallet } from "@/lib/WalletContext";
 import { Toaster, toast } from "sonner";
 import { User, X, Loader2, Sparkles } from "lucide-react";
 
-declare global {
-  interface Window {
-    ethereum?: any;
-  }
-}
-
 interface RegisterPopupProps {
   address: string;
-  provider: any;
   onRegistered: () => void;
   onClose: () => void;
 }
 
-export function RegisterPopup({ address, provider, onRegistered, onClose }: RegisterPopupProps) {
+export function RegisterPopup({ address, onRegistered, onClose }: RegisterPopupProps) {
   const [isRegistering, setIsRegistering] = useState(false);
   const [registerName, setRegisterName] = useState("");
+  const { provider } = useWallet();
 
   async function register() {
     if (!registerName.trim()) {
@@ -30,37 +25,26 @@ export function RegisterPopup({ address, provider, onRegistered, onClose }: Regi
 
     setIsRegistering(true);
     try {
-      const contractAddress = getContractAddress();
-      const walletProvider = provider || window.ethereum;
-
-      if (!walletProvider) {
-        toast.error("No wallet connected");
-        return;
+      // Request accounts first
+      if (provider) {
+        await provider.request({ method: "eth_requestAccounts" });
       }
 
-      // Request accounts to ensure wallet is connected
-      await walletProvider.request({ method: "eth_requestAccounts" });
+      const client = getClient(address as `0x${string}`, provider);
+      const contractAddress = getContractAddress();
 
-      // Encode the function call manually
-      const functionSelector = "0x445df0ac"; // register(string) selector
-      const encodedName = encodeString(registerName);
-      const calldata = functionSelector + encodedName;
-
-      // Send transaction directly via wallet provider
-      const txHash = await walletProvider.request({
-        method: "eth_sendTransaction",
-        params: [{
-          from: address,
-          to: contractAddress,
-          data: calldata,
-          value: "0x0",
-        }],
+      const txHash = await client.writeContract({
+        address: contractAddress as `0x${string}`,
+        functionName: "register",
+        args: [registerName],
+        value: BigInt(0),
       });
 
       toast.success("Registering...");
 
-      // Wait for receipt using RPC
-      await waitForReceipt(txHash);
+      await client.waitForTransactionReceipt({
+        hash: txHash,
+      });
 
       toast.success("Registered successfully!");
       onRegistered();
@@ -74,30 +58,6 @@ export function RegisterPopup({ address, provider, onRegistered, onClose }: Regi
     } finally {
       setIsRegistering(false);
     }
-  }
-
-  async function waitForReceipt(txHash: string) {
-    const walletProvider = provider || window.ethereum;
-    for (let i = 0; i < 30; i++) {
-      try {
-        const receipt = await walletProvider.request({
-          method: "eth_getTransactionReceipt",
-          params: [txHash],
-        });
-        if (receipt) return receipt;
-      } catch (e) {}
-      await new Promise(r => setTimeout(r, 3000));
-    }
-    throw new Error("Transaction timeout");
-  }
-
-  function encodeString(str: string): string {
-    const hex = Array.from(new TextEncoder().encode(str))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-    const paddedHex = hex.padEnd(64, '0');
-    const length = str.length.toString(16).padStart(64, '0');
-    return length + paddedHex;
   }
 
   return (

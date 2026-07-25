@@ -29,7 +29,7 @@ interface UserBet {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { address, userInfo, isRegistered, loading, connectWallet, refreshUserData } = useWallet();
+  const { address, provider, userInfo, isRegistered, loading, connectWallet, refreshUserData } = useWallet();
   const [userBets, setUserBets] = useState<UserBet[]>([]);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
@@ -77,7 +77,7 @@ export default function ProfilePage() {
 
     setIsWithdrawing(true);
     try {
-      const client = getClient(address as `0x${string}`);
+      const client = getClient(address as `0x${string}`, provider);
       const contractAddress = getContractAddress();
 
       const txHash = await client.writeContract({
