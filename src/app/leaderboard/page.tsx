@@ -39,7 +39,8 @@ export default function LeaderboardPage() {
       if (typeof result === "string") {
         parsed = JSON.parse(result);
       } else if (typeof result === "object" && result !== null && !Array.isArray(result)) {
-        const raw = result.raw ?? result.data ?? result.result ?? result;
+        const obj = result as Record<string, unknown>;
+        const raw = obj["raw"] ?? obj["data"] ?? obj["result"] ?? result;
         if (typeof raw === "string") {
           parsed = JSON.parse(raw);
         } else {
