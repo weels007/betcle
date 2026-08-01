@@ -364,7 +364,7 @@ Return JSON with these exact keys:
             class Write:
                 pass
 
-        _Recipient(Address(gl.message.sender_address)).emit_transfer(value=amount)
+        _Recipient(str(gl.message.sender_address)).emit_transfer(value=amount)
 
         return json.dumps({"withdrawn": str(amount)})
 
