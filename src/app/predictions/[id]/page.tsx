@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getClient, getContractAddress } from "@/lib/genlayer-client";
 import { useWallet } from "@/lib/WalletContext";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   Clock,
@@ -285,7 +285,6 @@ export default function PredictionDetailPage({
 
   return (
     <div className="max-w-4xl mx-auto py-12">
-      <Toaster position="top-right" />
 
       {/* Back Button */}
       <Link

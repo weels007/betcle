@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { getClient, getContractAddress } from "@/lib/genlayer-client";
 import { useWallet } from "@/lib/WalletContext";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import { User, X, Loader2, Sparkles } from "lucide-react";
 
 interface RegisterPopupProps {
@@ -68,7 +68,6 @@ export function RegisterPopup({ address, onRegistered, onClose }: RegisterPopupP
       />
       
       <div className="relative glass-card rounded-3xl p-8 max-w-md w-full animate-fade-in-up">
-        <Toaster position="top-right" />
         
         <button
           onClick={onClose}

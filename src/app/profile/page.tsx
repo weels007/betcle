@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getClient, getContractAddress } from "@/lib/genlayer-client";
 import { useWallet } from "@/lib/WalletContext";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import {
   User,
   Wallet,
@@ -144,7 +144,6 @@ export default function ProfilePage() {
   // Main profile view
   return (
     <div className="max-w-6xl mx-auto py-12">
-      <Toaster position="top-right" />
 
       {/* Header */}
       <div className="mb-12">

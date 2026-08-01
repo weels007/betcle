@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { getClient, getContractAddress } from "@/lib/genlayer-client";
 import { useWallet } from "@/lib/WalletContext";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import {
   Zap,
   Clock,
@@ -188,7 +188,6 @@ export default function InstantResolvePage() {
 
   return (
     <div className="max-w-6xl mx-auto py-12">
-      <Toaster position="top-right" />
 
       {/* Header */}
       <div className="text-center mb-12">

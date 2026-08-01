@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { getClient, getContractAddress } from "@/lib/genlayer-client";
 import { useWallet } from "@/lib/WalletContext";
-import { Toaster, toast } from "sonner";
+import { toast } from "sonner";
 import { Plus, Link as LinkIcon, Calendar, Tag, Sparkles, ArrowRight, Wallet } from "lucide-react";
 
 const categories = [
@@ -84,7 +84,6 @@ export default function CreatePage() {
 
   return (
     <div className="max-w-3xl mx-auto py-12">
-      <Toaster position="top-right" />
 
       {/* Header */}
       <div className="text-center mb-12">

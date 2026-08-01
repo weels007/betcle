@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Header } from "@/components/Header";
 import { WalletProvider } from "@/lib/WalletContext";
+import { Toaster } from "sonner";
 
 export const metadata: Metadata = {
   title: "Betcle - AI-Powered Prediction Market",
@@ -44,6 +45,14 @@ export default function RootLayout({
         </div>
 
         <WalletProvider>
+          <Toaster
+            position="top-center"
+            toastOptions={{
+              style: {
+                zIndex: 9999,
+              },
+            }}
+          />
           <Header />
           <main className="relative z-10 container mx-auto px-4 py-8 max-w-7xl">
             {children}
