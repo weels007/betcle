@@ -32,8 +32,10 @@ Unlike traditional prediction markets that rely on centralized oracles, Betcle u
 | 🎯 **Create Predictions** | Post any YES/NO question with a source URL and deadline |
 | 💰 **Bet with GEN** | Wager on outcomes using GenLayer's native token |
 | 🤖 **AI Resolution** | GenLayer validators fetch web data + LLM to determine outcomes |
+| ⚡ **Instant Resolve** | Resolve predictions before deadline (for testing) |
 | 🏆 **Leaderboard** | Rankings based on total winnings and accuracy |
 | 💸 **Withdraw** | Cash out your winnings directly to your wallet |
+| 🔐 **Multi-Wallet** | Support MetaMask, Rabby, Coinbase Wallet, and more |
 | 📊 **Multi-Category** | Crypto, Sports, Politics, Entertainment, Tech, Science |
 | 🔍 **Explore** | Browse and filter predictions by category |
 | 📱 **Responsive** | Beautiful UI on desktop and mobile |
@@ -129,6 +131,18 @@ withdraw(amount: u256) -> str
 ```
 Withdraw your balance to your wallet.
 
+```python
+instant_resolve(prediction_id: str) -> str
+```
+Resolve prediction before deadline (requires at least 1 bet). For testing only.
+
+#### Admin Methods
+
+```python
+withdraw_fee(amount: u256) -> str
+```
+Admin only. Withdraw platform fees to wallet.
+
 #### View Methods
 
 ```python
@@ -142,7 +156,7 @@ get_total_bets() -> u256                            # Total bets count
 get_total_users() -> u256                           # Total users count
 get_categories() -> str                             # List of categories
 get_platform_fee() -> u256                          # Platform fee (2%)
-update_leaderboard(address: str) -> str             # Update leaderboard entry
+get_platform_fee_balance() -> u256                  # Accumulated platform fees
 ```
 
 ---
@@ -152,7 +166,7 @@ update_leaderboard(address: str) -> str             # Update leaderboard entry
 ### Prerequisites
 
 - [Node.js](https://nodejs.org) 18+
-- [MetaMask](https://metamask.io) browser extension
+- EVM wallet (MetaMask, Rabby, Coinbase Wallet, etc.)
 - GEN tokens ([Faucet](https://testnet-faucet.genlayer.foundation))
 
 ### Installation
@@ -314,16 +328,21 @@ betcle/
 │   │   ├── predictions/
 │   │   │   ├── page.tsx          # Browse predictions
 │   │   │   └── [id]/page.tsx     # Prediction detail + betting
+│   │   ├── instant-resolve/
+│   │   │   └── page.tsx          # Instant resolve (testing)
 │   │   ├── leaderboard/
 │   │   │   └── page.tsx          # Rankings
 │   │   └── profile/
-│   │       └── page.tsx          # Profile + withdraw
+│   │       └── page.tsx          # Profile + withdraw + admin
 │   ├── components/
-│   │   ├── Header.tsx            # Navigation
-│   │   └── ConnectWallet.tsx     # MetaMask integration
+│   │   ├── Header.tsx            # Navigation + disconnect
+│   │   ├── WalletSelector.tsx    # Multi-wallet selection
+│   │   └── RegisterPopup.tsx     # Username registration
 │   └── lib/
-│       └── genlayer-client.ts    # GenLayer SDK config
+│       ├── genlayer-client.ts    # GenLayer SDK config
+│       └── WalletContext.tsx     # Global wallet state
 ├── .env.example
+├── .env.production              # Vercel config
 ├── package.json
 ├── tailwind.config.js
 └── README.md
