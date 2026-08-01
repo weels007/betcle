@@ -88,7 +88,7 @@ Unlike traditional prediction markets that rely on centralized oracles, Betcle u
 ### Deployed on Studionet
 
 ```
-Address: 0xe2547FebeA27d36714366E8b9C45eF986556C744
+Address: 0x7dcD4d2c791B7a9030966437cbccECDE32F3e64e
 Network: Studionet (Chain ID: 61999)
 RPC: https://studio.genlayer.com/api
 ```
@@ -252,7 +252,7 @@ Winners claim proportional rewards from the pool (minus 2% platform fee).
    - Import your repository
    - Configure environment variables:
      ```
-     NEXT_PUBLIC_CONTRACT_ADDRESS=0xe2547FebeA27d36714366E8b9C45eF986556C744
+     NEXT_PUBLIC_CONTRACT_ADDRESS=0x7dcD4d2c791B7a9030966437cbccECDE32F3e64e
      NEXT_PUBLIC_NETWORK=studionet
      ```
    - Click "Deploy"
@@ -285,7 +285,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 The smart contract is deployed on GenLayer Studionet:
 
 ```
-Contract Address: 0xe2547FebeA27d36714366E8b9C45eF986556C744
+Contract Address: 0x7dcD4d2c791B7a9030966437cbccECDE32F3e64e
 Network: Studionet (Chain ID: 61999)
 RPC: https://studio.genlayer.com/api
 Explorer: https://explorer-studio.genlayer.com
