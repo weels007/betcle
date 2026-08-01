@@ -36,6 +36,8 @@ export default function InstantResolvePage() {
   const [loading, setLoading] = useState(true);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
+  const isAnyResolving = resolvingId !== null;
+
   useEffect(() => {
     loadPredictions();
   }, []);
@@ -110,18 +112,23 @@ export default function InstantResolvePage() {
 
       toast.success("Transaction sent! AI consensus in progress...");
 
-      // Don't wait for receipt - AI consensus can take time
-      // Just refresh after a delay
-      setTimeout(() => {
-        loadPredictions();
+      // Keep loading state active while waiting for consensus
+      // Refresh every 5 seconds for up to 60 seconds
+      let attempts = 0;
+      const maxAttempts = 12;
+      const interval = setInterval(async () => {
+        attempts++;
+        await loadPredictions();
+        if (attempts >= maxAttempts) {
+          clearInterval(interval);
+          setResolvingId(null);
+          toast.success("Consensus may still be in progress. Check back later.");
+        }
       }, 5000);
 
-      toast.success("Prediction resolved! Refreshing...");
-      loadPredictions();
     } catch (error: any) {
       console.error("Failed to resolve:", error);
       toast.error(error.message || "Failed to resolve prediction");
-    } finally {
       setResolvingId(null);
     }
   }
@@ -255,9 +262,9 @@ export default function InstantResolvePage() {
                   <div className="flex-shrink-0">
                     <button
                       onClick={() => instantResolve(pred.id)}
-                      disabled={isResolving}
+                      disabled={isAnyResolving}
                       className={`btn-accent flex items-center gap-2 ${
-                        isResolving ? "opacity-50 cursor-not-allowed" : ""
+                        isAnyResolving ? "opacity-50 cursor-not-allowed" : ""
                       }`}
                     >
                       {isResolving ? (
