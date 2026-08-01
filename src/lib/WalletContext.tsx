@@ -50,19 +50,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     try {
       const client = getClient();
       const contractAddress = getContractAddress();
-      const expectedAddr = "0x7dcD4d2c791B7a9030966437cbccECDE32F3e64e";
 
       console.log("[WalletContext] Contract address:", contractAddress);
-      console.log("[WalletContext] Expected address:", expectedAddr);
-      console.log("[WalletContext] Address match:", contractAddress === expectedAddr);
 
       if (!contractAddress) {
         setLoading(false);
         return;
-      }
-
-      if (contractAddress !== expectedAddr) {
-        console.error("[WalletContext] WRONG CONTRACT ADDRESS! Using:", contractAddress, "Expected:", expectedAddr);
       }
 
       const infoResult = await client.readContract({
