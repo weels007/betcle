@@ -17,6 +17,7 @@ import {
   Sparkles,
   Coins,
   BarChart3,
+  Shield,
 } from "lucide-react";
 
 interface UserBet {
@@ -33,10 +34,15 @@ export default function ProfilePage() {
   const [userBets, setUserBets] = useState<UserBet[]>([]);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [feeBalance, setFeeBalance] = useState("0");
+  const [feeWithdrawAmount, setFeeWithdrawAmount] = useState("");
+  const [isWithdrawingFee, setIsWithdrawingFee] = useState(false);
 
   useEffect(() => {
     if (address) {
       loadUserBets();
+      checkAdmin();
     }
   }, [address]);
 
@@ -60,6 +66,77 @@ export default function ProfilePage() {
       }
     } catch (error) {
       console.error("Failed to load bets:", error);
+    }
+  }
+
+  async function checkAdmin() {
+    if (!address) return;
+    try {
+      const client = getClient();
+      const contractAddress = getContractAddress();
+      if (!contractAddress) return;
+
+      const [adminAddr, feeBal] = await Promise.all([
+        client.readContract({
+          address: contractAddress as `0x${string}`,
+          functionName: "get_admin",
+          args: [],
+        }),
+        client.readContract({
+          address: contractAddress as `0x${string}`,
+          functionName: "get_platform_fee_balance",
+          args: [],
+        }),
+      ]);
+
+      const adminLower = (adminAddr as string).toLowerCase();
+      const userLower = address.toLowerCase();
+      setIsAdmin(adminLower === userLower);
+
+      if (typeof feeBal === "bigint") {
+        setFeeBalance((Number(feeBal) / 10 ** 18).toFixed(4));
+      } else {
+        setFeeBalance((parseInt(feeBal as string) / 10 ** 18).toFixed(4));
+      }
+    } catch (error) {
+      console.error("Failed to check admin:", error);
+    }
+  }
+
+  async function withdrawFee() {
+    if (!feeWithdrawAmount || parseFloat(feeWithdrawAmount) <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+
+    setIsWithdrawingFee(true);
+    try {
+      const client = getClient(address as `0x${string}`, provider);
+      const contractAddress = getContractAddress();
+
+      const txHash = await client.writeContract({
+        address: contractAddress as `0x${string}`,
+        functionName: "withdraw_fee",
+        args: [BigInt(Math.floor(parseFloat(feeWithdrawAmount) * 10 ** 18))],
+        value: BigInt(0),
+      });
+
+      toast.success("Withdrawing platform fee...");
+
+      try {
+        await client.waitForTransactionReceipt({ hash: txHash });
+      } catch (e) {
+        console.log("Receipt timeout, proceeding...");
+      }
+
+      toast.success("Fee withdrawn!");
+      setFeeWithdrawAmount("");
+      checkAdmin();
+    } catch (error: any) {
+      console.error("Failed to withdraw fee:", error);
+      toast.error(error.message || "Failed to withdraw fee");
+    } finally {
+      setIsWithdrawingFee(false);
     }
   }
 
@@ -230,6 +307,41 @@ export default function ProfilePage() {
             </button>
           </div>
           <p className="text-sm text-gray-500 mt-2">Available: {formatGEN(userInfo.balance)} GEN</p>
+        </div>
+      )}
+
+      {/* Admin Fee Section */}
+      {isAdmin && (
+        <div className="glass-card rounded-2xl p-6 mb-10 border border-amber-500/20">
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <Shield className="w-5 h-5 text-amber-400" />
+            Admin — Platform Fee
+          </h2>
+          <p className="text-sm text-gray-400 mb-4">
+            Collected fee balance: <span className="text-amber-400 font-semibold">{feeBalance} GEN</span>
+          </p>
+          <div className="flex gap-4">
+            <input
+              type="number"
+              value={feeWithdrawAmount}
+              onChange={(e) => setFeeWithdrawAmount(e.target.value)}
+              placeholder="Amount in GEN"
+              className="input-field flex-1"
+              step="0.01"
+              min="0"
+            />
+            <button
+              onClick={withdrawFee}
+              disabled={isWithdrawingFee}
+              className="px-6 py-3 rounded-xl font-semibold transition-all duration-300 bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-lg hover:shadow-amber-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isWithdrawingFee ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                "Withdraw Fee"
+              )}
+            </button>
+          </div>
         </div>
       )}
 
