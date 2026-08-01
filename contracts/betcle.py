@@ -41,6 +41,8 @@ class BetcleContract(gl.Contract):
     user_predictions_created: TreeMap[str, u256]
     user_correct_bets: TreeMap[str, u256]
     user_total_bets: TreeMap[str, u256]
+    user_addresses: TreeMap[str, str]
+    user_address_count: u256
 
     # === Leaderboard Storage ===
     leaderboard_address: TreeMap[str, str]
@@ -70,6 +72,7 @@ class BetcleContract(gl.Contract):
         self.admin = _addr(gl.message.sender_address)
         self.leaderboard_count = u256(0)
         self.next_bet_id = u256(0)
+        self.user_address_count = u256(0)
         self.category_count = u256(7)
         self.category_list["0"] = "crypto"
         self.category_list["1"] = "sports"
@@ -97,6 +100,8 @@ class BetcleContract(gl.Contract):
         self.user_correct_bets[s] = u256(0)
         self.user_total_bets[s] = u256(0)
         self.total_users += u256(1)
+        self.user_addresses[str(self.user_address_count)] = s
+        self.user_address_count = self.user_address_count + u256(1)
         return "registered:" + name
 
     # ================================================================
@@ -349,6 +354,9 @@ Return JSON with these exact keys:
             self.user_correct_bets.get(s, u256(0)) + u256(1)
         )
 
+        # Auto-update leaderboard
+        self._update_leaderboard_entry(s)
+
         return json.dumps({"winnings": str(total_winnings)})
 
     @gl.public.write
@@ -470,22 +478,28 @@ Return JSON with these exact keys:
 
     @gl.public.view
     def get_leaderboard(self) -> str:
-        count = int(self.leaderboard_count)
+        count = int(self.user_address_count)
         entries = []
         for i in range(count):
             idx = str(i)
-            addr = self.leaderboard_address.get(idx, "")
-            if addr:
-                entries.append(
-                    {
-                        "name": self.leaderboard_name.get(idx, ""),
-                        "winnings": str(self.leaderboard_winnings.get(idx, u256(0))),
-                        "accuracy": str(
-                            self.leaderboard_accuracy.get(idx, u256(0))
-                        ),
-                        "address": addr[:10] + "...",
-                    }
-                )
+            addr = self.user_addresses.get(idx, "")
+            if not addr:
+                continue
+            total_won = int(self.user_total_won.get(addr, u256(0)))
+            total_bets = int(self.user_total_bets.get(addr, u256(0)))
+            correct = int(self.user_correct_bets.get(addr, u256(0)))
+            if total_bets == 0:
+                continue
+            name = self.user_name.get(addr, "unknown")
+            accuracy = u256((correct * 100) // total_bets) if total_bets > 0 else u256(0)
+            entries.append(
+                {
+                    "name": name,
+                    "winnings": str(total_won),
+                    "accuracy": str(int(accuracy)),
+                    "address": addr[:10] + "...",
+                }
+            )
         entries.sort(key=lambda x: int(x.get("winnings", "0")), reverse=True)
         return json.dumps(entries[:20])
 
@@ -515,27 +529,20 @@ Return JSON with these exact keys:
     def get_platform_fee(self) -> u256:
         return self.platform_fee_percent
 
-    @gl.public.write
-    def update_leaderboard(self, address: str) -> str:
-        s = _addr(gl.message.sender_address)
-        if not self.user_registered.get(s, False):
-            return "not registered"
-
+    def _update_leaderboard_entry(self, s: str):
         total_won = int(self.user_total_won.get(s, u256(0)))
         total_bets = int(self.user_total_bets.get(s, u256(0)))
         correct = int(self.user_correct_bets.get(s, u256(0)))
 
         if total_bets == 0:
-            return "no bets placed"
+            return
 
-        accuracy = (correct * u256(100)) / total_bets
+        accuracy = u256((correct * 100) // total_bets) if total_bets > 0 else u256(0)
 
         existing_idx = self.leaderboard_address.get(s, "")
         if existing_idx:
-            old_winnings = int(self.leaderboard_winnings.get(existing_idx, u256(0)))
-            if total_won > old_winnings:
-                self.leaderboard_winnings[existing_idx] = u256(total_won)
-                self.leaderboard_accuracy[existing_idx] = accuracy
+            self.leaderboard_winnings[existing_idx] = u256(total_won)
+            self.leaderboard_accuracy[existing_idx] = accuracy
         else:
             count = int(self.leaderboard_count)
             self.leaderboard_address[str(count)] = s
@@ -544,6 +551,13 @@ Return JSON with these exact keys:
             self.leaderboard_accuracy[str(count)] = accuracy
             self.leaderboard_count = u256(count + 1)
 
+    @gl.public.write
+    def update_leaderboard(self, address: str) -> str:
+        s = _addr(gl.message.sender_address)
+        if not self.user_registered.get(s, False):
+            return "not registered"
+
+        self._update_leaderboard_entry(s)
         return "leaderboard updated"
 
     @gl.public.view

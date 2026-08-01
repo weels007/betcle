@@ -35,8 +35,19 @@ export default function LeaderboardPage() {
         args: [],
       });
 
+      let parsed = result;
       if (typeof result === "string") {
-        setEntries(JSON.parse(result));
+        parsed = JSON.parse(result);
+      } else if (typeof result === "object" && result !== null && !Array.isArray(result)) {
+        const raw = result.raw ?? result.data ?? result.result ?? result;
+        if (typeof raw === "string") {
+          parsed = JSON.parse(raw);
+        } else {
+          parsed = raw;
+        }
+      }
+      if (Array.isArray(parsed)) {
+        setEntries(parsed);
       }
     } catch (error) {
       console.error("Failed to load leaderboard:", error);
