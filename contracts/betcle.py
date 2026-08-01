@@ -54,6 +54,8 @@ class BetcleContract(gl.Contract):
     total_bets: u256
     total_users: u256
     platform_fee_percent: u256
+    platform_fee_balance: u256
+    admin: str
 
     # === Categories ===
     category_list: TreeMap[str, str]
@@ -64,6 +66,8 @@ class BetcleContract(gl.Contract):
         self.total_bets = u256(0)
         self.total_users = u256(0)
         self.platform_fee_percent = u256(2)
+        self.platform_fee_balance = u256(0)
+        self.admin = _addr(gl.message.sender_address)
         self.leaderboard_count = u256(0)
         self.next_bet_id = u256(0)
         self.category_count = u256(7)
@@ -313,6 +317,9 @@ Return JSON with these exact keys:
         fee = (total_pool * self.platform_fee_percent) // u256(100)
         prize_pool = total_pool - fee
 
+        # Collect platform fee
+        self.platform_fee_balance = self.platform_fee_balance + fee
+
         bet_count = int(self.user_bet_count.get(s, u256(0)))
         total_winnings = u256(0)
 
@@ -367,6 +374,30 @@ Return JSON with these exact keys:
         _Recipient(str(gl.message.sender_address)).emit_transfer(value=amount)
 
         return json.dumps({"withdrawn": str(amount)})
+
+    @gl.public.write
+    def withdraw_fee(self, amount: u256) -> str:
+        s = _addr(gl.message.sender_address)
+        if s != self.admin:
+            raise gl.vm.UserError("only admin can withdraw fees")
+
+        if amount == u256(0):
+            raise gl.vm.UserError("amount must be greater than 0")
+        if amount > self.platform_fee_balance:
+            raise gl.vm.UserError("insufficient fee balance")
+
+        self.platform_fee_balance = self.platform_fee_balance - amount
+
+        @gl.evm.contract_interface
+        class _FeeRecipient:
+            class View:
+                pass
+            class Write:
+                pass
+
+        _FeeRecipient(str(gl.message.sender_address)).emit_transfer(value=amount)
+
+        return json.dumps({"withdrawn_fee": str(amount)})
 
     # ================================================================
     # VIEW METHODS
@@ -514,3 +545,11 @@ Return JSON with these exact keys:
             self.leaderboard_count = u256(count + 1)
 
         return "leaderboard updated"
+
+    @gl.public.view
+    def get_platform_fee_balance(self) -> u256:
+        return self.platform_fee_balance
+
+    @gl.public.view
+    def get_admin(self) -> str:
+        return self.admin
