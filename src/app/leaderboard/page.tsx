@@ -35,16 +35,15 @@ export default function LeaderboardPage() {
         args: [],
       });
 
-      let parsed = result;
+      let parsed: unknown = result;
       if (typeof result === "string") {
         parsed = JSON.parse(result);
-      } else if (typeof result === "object" && result !== null && !Array.isArray(result)) {
-        const obj = result as Record<string, unknown>;
-        const raw = obj["raw"] ?? obj["data"] ?? obj["result"] ?? result;
-        if (typeof raw === "string") {
-          parsed = JSON.parse(raw);
-        } else {
-          parsed = raw;
+      } else {
+        try {
+          const str = JSON.stringify(result);
+          parsed = JSON.parse(str);
+        } catch {
+          parsed = result;
         }
       }
       if (Array.isArray(parsed)) {
