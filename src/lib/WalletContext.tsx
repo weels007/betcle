@@ -91,6 +91,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       });
       setAddress(accounts[0]);
       setProvider(selectedProvider);
+      setLoading(false);
+
+      // Show register popup immediately, hide later if already registered
+      setShowRegisterPopup(true);
 
       // Switch to Studionet
       try {
@@ -119,6 +123,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Check registration in background, hide popup if registered
       await loadUserData(accounts[0]);
       return true;
     } catch (error) {
@@ -170,6 +175,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         if (accounts.length > 0) {
           setAddress(accounts[0]);
           setProvider(window.ethereum);
+          setLoading(false);
+          // Check registration in background
           await loadUserData(accounts[0]);
         } else {
           setLoading(false);
