@@ -61,7 +61,6 @@ function PredictionsContent() {
 
   async function loadPredictions() {
     try {
-      const client = getClient();
       const contractAddress = getContractAddress();
 
       if (!contractAddress) {
@@ -69,13 +68,19 @@ function PredictionsContent() {
         return;
       }
 
+      const client = getClient();
       const totalResult = await client.readContract({
         address: contractAddress as `0x${string}`,
         functionName: "get_total_predictions",
         args: [],
       });
 
-      const total = parseInt(totalResult as string);
+      const total = typeof totalResult === "bigint"
+        ? Number(totalResult)
+        : parseInt(totalResult as string);
+
+      console.log("Total predictions on-chain:", total);
+
       const loaded: Prediction[] = [];
 
       for (let i = 0; i < total; i++) {
@@ -88,12 +93,15 @@ function PredictionsContent() {
 
           if (typeof result === "string") {
             loaded.push(JSON.parse(result));
+          } else if (typeof result === "object" && result !== null) {
+            loaded.push(result as unknown as Prediction);
           }
         } catch (e) {
           console.error(`Failed to load prediction ${i}:`, e);
         }
       }
 
+      console.log("Loaded predictions:", loaded.length);
       setPredictions(loaded.reverse());
     } catch (error) {
       console.error("Failed to load predictions:", error);

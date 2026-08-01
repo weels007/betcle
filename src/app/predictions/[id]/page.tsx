@@ -92,7 +92,6 @@ export default function PredictionDetailPage({
 
   async function loadPrediction() {
     try {
-      const client = getClient();
       const contractAddress = getContractAddress();
 
       if (!contractAddress) {
@@ -100,6 +99,7 @@ export default function PredictionDetailPage({
         return;
       }
 
+      const client = getClient();
       const result = await client.readContract({
         address: contractAddress as `0x${string}`,
         functionName: "get_prediction",
@@ -108,6 +108,8 @@ export default function PredictionDetailPage({
 
       if (typeof result === "string") {
         setPrediction(JSON.parse(result));
+      } else if (typeof result === "object" && result !== null) {
+        setPrediction(result as unknown as Prediction);
       }
     } catch (error) {
       console.error("Failed to load prediction:", error);

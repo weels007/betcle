@@ -58,7 +58,9 @@ export default function InstantResolvePage() {
         args: [],
       });
 
-      const total = parseInt(totalResult as string);
+      const total = typeof totalResult === "bigint"
+        ? Number(totalResult)
+        : parseInt(totalResult as string);
       const loaded: Prediction[] = [];
 
       for (let i = 0; i < total; i++) {
@@ -69,12 +71,17 @@ export default function InstantResolvePage() {
             args: [String(i)],
           });
 
+          let pred: Prediction;
           if (typeof result === "string") {
-            const pred = JSON.parse(result);
-            // Only show unresolved predictions with bets
-            if (!pred.resolved && parseInt(pred.total_bets) > 0) {
-              loaded.push(pred);
-            }
+            pred = JSON.parse(result);
+          } else if (typeof result === "object" && result !== null) {
+            pred = result as unknown as Prediction;
+          } else {
+            continue;
+          }
+          // Only show unresolved predictions with bets
+          if (!pred.resolved && parseInt(pred.total_bets) > 0) {
+            loaded.push(pred);
           }
         } catch (e) {
           console.error(`Failed to load prediction ${i}:`, e);

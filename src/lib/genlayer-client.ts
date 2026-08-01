@@ -9,19 +9,26 @@ const STUDIONET_HEX = "0xf22f"; // 61999
 let clientInstance: ReturnType<typeof createClient> | null = null;
 
 export function getClient(address?: `0x${string}`, provider?: any) {
-  if (!address && clientInstance) {
+  // For writes: use address + provider
+  if (address) {
+    const wrappedProvider = provider ? wrapProvider(provider) : undefined;
+    const client = createClient({
+      chain: studionet,
+      account: address,
+      ...(wrappedProvider && { provider: wrappedProvider }),
+    });
+    clientInstance = client;
+    return client;
+  }
+
+  // For reads: reuse cached client or create fresh without account
+  if (clientInstance) {
     return clientInstance;
   }
 
-  // Wrap provider to force legacy gasPrice=0 for zero-fee network
-  const wrappedProvider = provider ? wrapProvider(provider) : undefined;
-
   clientInstance = createClient({
     chain: studionet,
-    account: address,
-    ...(wrappedProvider && { provider: wrappedProvider }),
   });
-
   return clientInstance;
 }
 
