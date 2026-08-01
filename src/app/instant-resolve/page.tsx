@@ -110,15 +110,40 @@ export default function InstantResolvePage() {
         value: BigInt(0),
       });
 
-      toast.success("Transaction sent! AI consensus in progress...");
+      toast.success("Transaction sent! Waiting for confirmation...");
 
-      // Keep loading state active while waiting for consensus
-      // Refresh every 5 seconds for up to 60 seconds
+      // Wait for transaction to be mined first
+      let receipt = null;
+      for (let i = 0; i < 20; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+        try {
+          receipt = await client.waitForTransactionReceipt({
+            hash: txHash,
+          });
+          if (receipt) break;
+        } catch (e) {
+          // Keep trying
+        }
+      }
+
+      if (!receipt) {
+        toast.error("Transaction not found. Check wallet for status.");
+        setResolvingId(null);
+        return;
+      }
+
+      toast.success("Transaction confirmed! AI consensus in progress...");
+
+      // Now poll for prediction resolution
       let attempts = 0;
-      const maxAttempts = 12;
+      const maxAttempts = 20;
       const interval = setInterval(async () => {
         attempts++;
-        await loadPredictions();
+        try {
+          await loadPredictions();
+        } catch (e) {
+          console.error("Refresh failed:", e);
+        }
         if (attempts >= maxAttempts) {
           clearInterval(interval);
           setResolvingId(null);

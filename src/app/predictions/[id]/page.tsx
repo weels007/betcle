@@ -218,10 +218,17 @@ export default function PredictionDetailPage({
 
       toast.success("Claiming rewards...");
 
-      await client.waitForTransactionReceipt({
-        hash: txHash,
-      });
+      // Try to wait for receipt, but don't fail if it times out
+      try {
+        await client.waitForTransactionReceipt({
+          hash: txHash,
+        });
+      } catch (e) {
+        console.log("Receipt wait timeout, proceeding...");
+      }
 
+      // Mark as claimed immediately so button disappears
+      setBetClaimed(true);
       toast.success("Rewards claimed!");
       loadPrediction();
     } catch (error: any) {

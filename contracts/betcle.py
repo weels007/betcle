@@ -310,7 +310,7 @@ Return JSON with these exact keys:
         if winning_pool == u256(0):
             return "no winning pool"
 
-        fee = (total_pool * self.platform_fee_percent) / u256(100)
+        fee = (total_pool * self.platform_fee_percent) // u256(100)
         prize_pool = total_pool - fee
 
         bet_count = int(self.user_bet_count.get(s, u256(0)))
@@ -329,7 +329,7 @@ Return JSON with these exact keys:
                 continue
 
             bet_amount = self.bet_amount.get(bet_id, u256(0))
-            winnings = (bet_amount * prize_pool) / winning_pool
+            winnings = (bet_amount * prize_pool) // winning_pool
             total_winnings += winnings
             self.bet_claimed[bet_id] = True
 
