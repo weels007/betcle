@@ -7,28 +7,29 @@ const RPC = "https://studio.genlayer.com/api";
 const STUDIONET_HEX = "0xf22f"; // 61999
 
 let clientInstance: ReturnType<typeof createClient> | null = null;
+let cachedAddress: string | null = null;
 
 export function getClient(address?: `0x${string}`, provider?: any) {
   // For writes: use address + provider
   if (address) {
     const wrappedProvider = provider ? wrapProvider(provider) : undefined;
-    const client = createClient({
+    return createClient({
       chain: studionet,
       account: address,
       ...(wrappedProvider && { provider: wrappedProvider }),
     });
-    clientInstance = client;
-    return client;
   }
 
-  // For reads: reuse cached client or create fresh without account
-  if (clientInstance) {
+  // For reads: invalidate if contract address changed
+  const currentAddr = getContractAddress();
+  if (clientInstance && cachedAddress === currentAddr) {
     return clientInstance;
   }
 
   clientInstance = createClient({
     chain: studionet,
   });
+  cachedAddress = currentAddr;
   return clientInstance;
 }
 

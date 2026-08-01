@@ -51,6 +51,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       const client = getClient();
       const contractAddress = getContractAddress();
 
+      console.log("[WalletContext] Contract address:", contractAddress);
+
       if (!contractAddress) {
         setLoading(false);
         return;
@@ -61,6 +63,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         functionName: "get_user_info",
         args: [addr],
       });
+
+      console.log("[WalletContext] User info result:", infoResult);
 
       if (typeof infoResult === "string" && infoResult !== "not found" && infoResult !== "") {
         setUserInfo(JSON.parse(infoResult));
