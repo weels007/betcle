@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getClient, getContractAddress } from "@/lib/genlayer-client";
 import { useWallet } from "@/lib/WalletContext";
@@ -55,12 +55,19 @@ export default function PredictionDetailPage({
   const [hasBet, setHasBet] = useState(false);
   const [userBetChoice, setUserBetChoice] = useState<string>("");
   const [betClaimed, setBetClaimed] = useState(false);
+  const [consensusStatus, setConsensusStatus] = useState("");
+
+  const mountedRef = useRef(true);
 
   useEffect(() => {
+    mountedRef.current = true;
     loadPrediction();
     if (address) {
       checkUserBet();
     }
+    return () => {
+      mountedRef.current = false;
+    };
   }, [id, address]);
 
   async function checkUserBet() {
@@ -92,14 +99,10 @@ export default function PredictionDetailPage({
     }
   }
 
-  async function loadPrediction() {
+  async function fetchPrediction(): Promise<Prediction | null> {
     try {
       const contractAddress = getContractAddress();
-
-      if (!contractAddress) {
-        setLoading(false);
-        return;
-      }
+      if (!contractAddress) return null;
 
       const client = getClient();
       const result = await client.readContract({
@@ -109,13 +112,22 @@ export default function PredictionDetailPage({
       });
 
       if (typeof result === "string") {
-        setPrediction(JSON.parse(result));
-      } else if (typeof result === "object" && result !== null) {
-        setPrediction(result as unknown as Prediction);
+        return JSON.parse(result);
       }
+      if (typeof result === "object" && result !== null) {
+        return result as unknown as Prediction;
+      }
+      return null;
     } catch (error) {
       console.error("Failed to load prediction:", error);
-    } finally {
+      return null;
+    }
+  }
+
+  async function loadPrediction() {
+    const pred = await fetchPrediction();
+    if (mountedRef.current) {
+      if (pred) setPrediction(pred);
       setLoading(false);
     }
   }
@@ -171,6 +183,7 @@ export default function PredictionDetailPage({
     }
 
     setIsResolving(true);
+    setConsensusStatus("Submitting resolution transaction...");
     try {
       const client = getClient(address as `0x${string}`, provider);
       const contractAddress = getContractAddress();
@@ -182,21 +195,37 @@ export default function PredictionDetailPage({
         value: BigInt(0),
       });
 
-      toast.success("Resolving... AI validators are analyzing...");
+      toast.success("Resolution submitted! AI validators are analyzing...");
+      setConsensusStatus("Waiting for AI consensus...");
 
-      // Don't wait for receipt - AI consensus can take time
-      // Just refresh after a delay
-      setTimeout(() => {
-        loadPrediction();
-      }, 5000);
+      // AI consensus (web fetch + LLM + validator agreement) can take a
+      // while, so poll the contract until the prediction is settled.
+      const maxAttempts = 36; // ~3 minutes at 5s intervals
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        if (!mountedRef.current) return;
 
-      toast.success("Prediction resolved! Refreshing...");
-      loadPrediction();
+        const pred = await fetchPrediction();
+        if (mountedRef.current && pred) setPrediction(pred);
+        if (pred?.resolved) {
+          if (pred.result === "inconclusive") {
+            toast.info("Resolution inconclusive — all stakes are refundable.");
+          } else {
+            toast.success(`Prediction resolved: ${pred.result.toUpperCase()}!`);
+          }
+          return;
+        }
+      }
+
+      toast.warning(
+        "Consensus is still in progress. Please wait a moment and refresh."
+      );
     } catch (error: any) {
       console.error("Failed to resolve:", error);
       toast.error(error.message || "Failed to resolve prediction");
     } finally {
       setIsResolving(false);
+      setConsensusStatus("");
     }
   }
 
@@ -547,6 +576,12 @@ export default function PredictionDetailPage({
                 </span>
               )}
             </button>
+            {isResolving && consensusStatus && (
+              <div className="mt-4 flex items-center justify-center gap-2 text-sm text-amber-300">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>{consensusStatus}</span>
+              </div>
+            )}
           </div>
         </div>
       )}
