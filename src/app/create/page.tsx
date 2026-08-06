@@ -117,9 +117,10 @@ export default function CreatePage() {
               placeholder="Will Bitcoin reach $100k by end of 2026?"
               className="input-field text-lg"
               required
+              maxLength={200}
             />
             <p className="text-xs text-gray-500 pl-1">
-              A clear, answerable question with a definitive YES/NO answer
+              A clear, answerable question with a definitive YES/NO answer (max 200 chars)
             </p>
           </div>
 
@@ -187,6 +188,7 @@ export default function CreatePage() {
             />
             <p className="text-xs text-gray-500 pl-1">
               No more bets after this time. Resolution can happen after deadline.
+              Must be within the next 365 days.
             </p>
           </div>
 

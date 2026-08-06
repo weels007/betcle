@@ -32,7 +32,8 @@ Unlike traditional prediction markets that rely on centralized oracles, Betcle u
 | 🎯 **Create Predictions** | Post any YES/NO question with a source URL and deadline |
 | 💰 **Bet with GEN** | Wager on outcomes using GenLayer's native token |
 | 🤖 **AI Resolution** | GenLayer validators fetch web data + LLM to determine outcomes |
-| ⚡ **Instant Resolve** | Resolve predictions before deadline (for testing) |
+| 🛡️ **Full Lifecycle** | Deadline enforced on-chain: betting closes at deadline, resolution only after |
+| ↩️ **Inconclusive Refunds** | If AI can't determine an outcome, every bettor is refunded in full |
 | 🏆 **Leaderboard** | Rankings based on total winnings and accuracy |
 | 💸 **Withdraw** | Cash out your winnings directly to your wallet |
 | 🔐 **Multi-Wallet** | Support MetaMask, Rabby, Coinbase Wallet, and more |
@@ -90,7 +91,7 @@ Unlike traditional prediction markets that rely on centralized oracles, Betcle u
 ### Deployed on Studionet
 
 ```
-Address: 0x8cb16c5a055b4830154799Ec64549F51fc74A6C7
+Address: 0x673d1C55F451aBbAeBcE6E79af17f1d5b01c271c
 Network: Studionet (Chain ID: 61999)
 RPC: https://studio.genlayer.com/api
 ```
@@ -109,32 +110,32 @@ Register a new account with a username.
 ```python
 create_prediction(question: str, category: str, resolution_url: str, deadline: u256) -> str
 ```
-Create a new prediction with a YES/NO question, category, resolution source, and deadline.
+Create a new prediction with a YES/NO question, category, resolution source, and deadline. The deadline must be in the future.
 
 ```python
 place_bet(prediction_id: str, choice: str) -> None [payable]
 ```
-Place a bet on a prediction. Send GEN as value. Choice must be `"yes"` or `"no"`.
+Place a bet on a prediction. Send GEN as value. Choice must be `"yes"` or `"no"`. Betting is rejected after the deadline.
 
 ```python
 resolve_prediction(prediction_id: str) -> str
 ```
-Trigger AI resolution. GenLayer validators fetch the URL and use LLM to determine the outcome.
+Trigger AI resolution. GenLayer validators fetch the URL and use LLM to determine the outcome. Only callable after the deadline. If the AI cannot produce a definitive answer (or nobody bet on the winning side), the prediction is marked `inconclusive` and all bets become refundable.
 
 ```python
 claim_rewards(prediction_id: str) -> str
 ```
-Claim winnings from a resolved prediction. Proportional payout based on winning pool.
+Claim winnings from a resolved prediction. Proportional payout based on winning pool. The 2% platform fee is accrued exactly **once per prediction** and only when a real winning claim is paid out.
+
+```python
+refund_bets(prediction_id: str) -> str
+```
+Refund your full stake when a prediction settles as `inconclusive`. No fee is taken on refunds.
 
 ```python
 withdraw(amount: u256) -> str
 ```
 Withdraw your balance to your wallet.
-
-```python
-instant_resolve(prediction_id: str) -> str
-```
-Resolve prediction before deadline (requires at least 1 bet). For testing only.
 
 #### Admin Methods
 
@@ -227,9 +228,18 @@ After the deadline, anyone can trigger resolution. GenLayer validators:
 3. Reach consensus via Equivalence Principle
 4. Determine the outcome (YES/NO)
 
-### 4. Claim Rewards
+The contract enforces this lifecycle on-chain: bets are rejected after the
+deadline and resolution is rejected before it. If the AI cannot reach a
+definitive outcome — or nobody bet on the winning side — the prediction is
+settled as `inconclusive` so every bettor can be refunded.
 
-Winners claim proportional rewards from the pool (minus 2% platform fee).
+### 4. Claim Rewards (or Refund)
+
+Winners claim proportional rewards from the pool (minus 2% platform fee). The
+fee is accrued exactly once per prediction and only when a real winning claim
+is paid out, so repeated or invalid claims can never inflate the
+admin-withdrawable fee balance. Inconclusive predictions let every bettor
+refund their full stake instead.
 
 ---
 
@@ -266,7 +276,7 @@ Winners claim proportional rewards from the pool (minus 2% platform fee).
    - Import your repository
    - Configure environment variables:
      ```
-     NEXT_PUBLIC_CONTRACT_ADDRESS=0x8cb16c5a055b4830154799Ec64549F51fc74A6C7
+     NEXT_PUBLIC_CONTRACT_ADDRESS=0x673d1C55F451aBbAeBcE6E79af17f1d5b01c271c
      NEXT_PUBLIC_NETWORK=studionet
      ```
    - Click "Deploy"
@@ -299,7 +309,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 The smart contract is deployed on GenLayer Studionet:
 
 ```
-Contract Address: 0x8cb16c5a055b4830154799Ec64549F51fc74A6C7
+Contract Address: 0x673d1C55F451aBbAeBcE6E79af17f1d5b01c271c
 Network: Studionet (Chain ID: 61999)
 RPC: https://studio.genlayer.com/api
 Explorer: https://explorer-studio.genlayer.com
@@ -318,6 +328,11 @@ To deploy your own contract:
 betcle/
 ├── contracts/
 │   └── betcle.py                 # GenLayer Intelligent Contract
+├── tests/
+│   ├── conftest.py               # Windows workaround for gltest direct mode
+│   └── test_betcle.py            # Fund-conservation + lifecycle tests
+├── requirements.txt              # genlayer-test, genvm-linter, pytest
+├── gltest.config.yaml            # Test network configuration
 ├── src/
 │   ├── app/
 │   │   ├── layout.tsx            # Root layout
@@ -360,6 +375,31 @@ betcle/
 6. Connect MetaMask to Studionet
 7. Get GEN from faucet
 8. Test the full flow!
+
+## 🧪 Testing
+
+The contract ships with a direct-mode test suite (`genlayer-test`) that runs in-memory in milliseconds — no Docker or network required.
+
+```bash
+# Python 3.12+ recommended
+pip install -r requirements.txt
+
+# Run all tests
+pytest tests/ -v
+```
+
+The suite verifies:
+
+- **Fee integrity** — the 2% platform fee is accrued exactly once per prediction and only when a real winning claim is paid out; repeated or invalid claims never inflate the admin-withdrawable fee balance.
+- **Lifecycle enforcement** — creation requires a future deadline, betting is blocked after the deadline, resolution is blocked before it, and resolution requires at least one bet.
+- **Inconclusive refunds** — if AI resolution fails, or nobody bet on the winning side, the prediction settles as `inconclusive` and every bettor can refund their full stake (no fee).
+- **Fund conservation** — YES wins, NO wins, partial claims, and refunds never pay out more than the total pool (fee + winners + dust ≤ pool).
+
+You can also lint the contract:
+
+```bash
+genvm-lint check contracts/betcle.py
+```
 
 ---
 

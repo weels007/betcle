@@ -28,6 +28,7 @@ interface Prediction {
   deadline: string;
   creator: string;
   resolved: boolean;
+  status: string;
   result: string;
   analysis: string;
   total_yes: string;
@@ -50,6 +51,7 @@ export default function PredictionDetailPage({
   const [isBetting, setIsBetting] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [isRefunding, setIsRefunding] = useState(false);
   const [hasBet, setHasBet] = useState(false);
   const [userBetChoice, setUserBetChoice] = useState<string>("");
   const [betClaimed, setBetClaimed] = useState(false);
@@ -241,6 +243,47 @@ export default function PredictionDetailPage({
     }
   }
 
+  async function refundBets() {
+    // Auto-connect wallet if not connected
+    if (!address) {
+      toast.info("Connecting wallet...");
+      const connected = await connectWallet();
+      if (!connected) return;
+    }
+
+    setIsRefunding(true);
+    try {
+      const client = getClient(address as `0x${string}`, provider);
+      const contractAddress = getContractAddress();
+
+      const txHash = await client.writeContract({
+        address: contractAddress as `0x${string}`,
+        functionName: "refund_bets",
+        args: [id],
+        value: BigInt(0),
+      });
+
+      toast.success("Refunding your stake...");
+
+      try {
+        await client.waitForTransactionReceipt({
+          hash: txHash,
+        });
+      } catch (e) {
+        console.log("Receipt wait timeout, proceeding...");
+      }
+
+      setBetClaimed(true);
+      toast.success("Stake refunded!");
+      loadPrediction();
+    } catch (error: any) {
+      console.error("Failed to refund:", error);
+      toast.error(error.message || "Failed to refund stake");
+    } finally {
+      setIsRefunding(false);
+    }
+  }
+
   function formatGEN(wei: string) {
     return (parseInt(wei) / 10 ** 18).toFixed(2);
   }
@@ -302,7 +345,11 @@ export default function PredictionDetailPage({
           <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-500/20 text-teal-300 border border-teal-500/20">
             {prediction.category}
           </span>
-          {prediction.resolved ? (
+          {prediction.resolved && prediction.result === "inconclusive" ? (
+            <span className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-500/20 text-gray-300">
+              INCONCLUSIVE
+            </span>
+          ) : prediction.resolved ? (
             <span className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
               prediction.result === "yes"
                 ? "bg-green-500/20 text-green-300"
@@ -397,7 +444,27 @@ export default function PredictionDetailPage({
       </div>
 
       {/* Action Panel */}
-      {!prediction.resolved && !deadlinePassed && (
+      {!prediction.resolved &&
+        !deadlinePassed &&
+        address?.toLowerCase() === prediction.creator && (
+          <div className="glass-card rounded-3xl p-8">
+            <div className="text-center">
+              <AlertCircle className="w-12 h-12 text-amber-400 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-white mb-2">
+                You Created This Prediction
+              </h2>
+              <p className="text-gray-400">
+                The creator controls the resolution source, so the contract
+                prevents you from betting on your own prediction.
+              </p>
+            </div>
+          </div>
+        )}
+
+      {/* Action Panel */}
+      {!prediction.resolved &&
+        !deadlinePassed &&
+        address?.toLowerCase() !== prediction.creator && (
         <div className="glass-card rounded-3xl p-8">
           <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-teal-400" />
@@ -484,62 +551,128 @@ export default function PredictionDetailPage({
         </div>
       )}
 
-      {/* Claim Button - Only show if user has bet on this prediction */}
-      {prediction.resolved && hasBet && !betClaimed && (
-        <div className="glass-card rounded-3xl p-8">
-          <div className="text-center">
-            <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-white mb-2">Resolved: {prediction.result.toUpperCase()}</h2>
-            <p className="text-gray-400 mb-6">
-              You bet <span className={`font-bold ${userBetChoice === "yes" ? "text-green-400" : "text-red-400"}`}>{userBetChoice.toUpperCase()}</span>
-              {prediction.result === userBetChoice ? (
-                <span className="text-green-400"> - You won!</span>
-              ) : (
-                <span className="text-red-400"> - You lost</span>
-              )}
-            </p>
-            {prediction.result === userBetChoice && (
+      {/* Inconclusive - Refund Button */}
+      {prediction.resolved &&
+        prediction.result === "inconclusive" &&
+        hasBet &&
+        !betClaimed && (
+          <div className="glass-card rounded-3xl p-8 border border-gray-500/20">
+            <div className="text-center">
+              <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-white mb-2">
+                Inconclusive Resolution
+              </h2>
+              <p className="text-gray-400 mb-6">
+                AI validators could not determine a definitive outcome, so all
+                bets are refundable in full. You bet{" "}
+                <span className="font-bold text-white">
+                  {userBetChoice.toUpperCase()}
+                </span>
+                .
+              </p>
               <button
-                onClick={claimRewards}
-                disabled={isClaiming}
-                className="btn-primary"
+                onClick={refundBets}
+                disabled={isRefunding}
+                className="btn-accent"
               >
-                {isClaiming ? (
+                {isRefunding ? (
                   <span className="flex items-center gap-2">
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Claiming...
+                    Refunding...
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">
                     <Coins className="w-5 h-5" />
-                    Claim Rewards
+                    Refund My Stake
                   </span>
                 )}
               </button>
-            )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+      {/* Inconclusive - Already Refunded */}
+      {prediction.resolved &&
+        prediction.result === "inconclusive" &&
+        hasBet &&
+        betClaimed && (
+          <div className="glass-card rounded-3xl p-8">
+            <div className="text-center">
+              <CheckCircle className="w-12 h-12 text-teal-400 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-white mb-2">Stake Refunded</h2>
+              <p className="text-gray-400">
+                Your stake was refunded for this inconclusive prediction.
+              </p>
+            </div>
+          </div>
+        )}
+
+      {/* Claim Button - Only show if user has bet on this prediction */}
+      {prediction.resolved &&
+        prediction.result !== "inconclusive" &&
+        hasBet &&
+        !betClaimed && (
+          <div className="glass-card rounded-3xl p-8">
+            <div className="text-center">
+              <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-white mb-2">Resolved: {prediction.result.toUpperCase()}</h2>
+              <p className="text-gray-400 mb-6">
+                You bet <span className={`font-bold ${userBetChoice === "yes" ? "text-green-400" : "text-red-400"}`}>{userBetChoice.toUpperCase()}</span>
+                {prediction.result === userBetChoice ? (
+                  <span className="text-green-400"> - You won!</span>
+                ) : (
+                  <span className="text-red-400"> - You lost</span>
+                )}
+              </p>
+              {prediction.result === userBetChoice && (
+                <button
+                  onClick={claimRewards}
+                  disabled={isClaiming}
+                  className="btn-primary"
+                >
+                  {isClaiming ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Claiming...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Coins className="w-5 h-5" />
+                      Claim Rewards
+                    </span>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
       {/* Already Claimed */}
-      {prediction.resolved && hasBet && betClaimed && (
-        <div className="glass-card rounded-3xl p-8">
-          <div className="text-center">
-            <CheckCircle className="w-12 h-12 text-teal-400 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-white mb-2">Rewards Claimed!</h2>
-            <p className="text-gray-400">
-              You already claimed your rewards for this prediction.
-            </p>
+      {prediction.resolved &&
+        prediction.result !== "inconclusive" &&
+        hasBet &&
+        betClaimed && (
+          <div className="glass-card rounded-3xl p-8">
+            <div className="text-center">
+              <CheckCircle className="w-12 h-12 text-teal-400 mx-auto mb-4" />
+              <h2 className="text-xl font-bold text-white mb-2">Rewards Claimed!</h2>
+              <p className="text-gray-400">
+                You already claimed your rewards for this prediction.
+              </p>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* No Bet Placed */}
       {prediction.resolved && !hasBet && (
         <div className="glass-card rounded-3xl p-8">
           <div className="text-center">
             <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-white mb-2">Resolved: {prediction.result.toUpperCase()}</h2>
+            <h2 className="text-xl font-bold text-white mb-2">
+              {prediction.result === "inconclusive"
+                ? "Inconclusive Resolution"
+                : `Resolved: ${prediction.result.toUpperCase()}`}
+            </h2>
             <p className="text-gray-400">
               You didn't place a bet on this prediction.
             </p>

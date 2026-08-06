@@ -237,7 +237,9 @@ function PredictionsContent() {
                       {pred.category}
                     </span>
                     <div className="flex items-center gap-2">
-                      {pred.resolved ? (
+                      {pred.resolved && pred.result === "inconclusive" ? (
+                        <AlertCircle className="w-5 h-5 text-gray-400" />
+                      ) : pred.resolved ? (
                         pred.result === "yes" ? (
                           <CheckCircle className="w-5 h-5 text-green-400" />
                         ) : (
@@ -249,11 +251,13 @@ function PredictionsContent() {
                         <Clock className="w-5 h-5 text-gray-400" />
                       )}
                       <span className="text-xs text-gray-400 font-medium">
-                        {pred.resolved
-                          ? pred.result.toUpperCase()
-                          : deadlinePassed
-                            ? "Pending"
-                            : "Active"}
+                        {pred.resolved && pred.result === "inconclusive"
+                          ? "Inconclusive"
+                          : pred.resolved
+                            ? pred.result.toUpperCase()
+                            : deadlinePassed
+                              ? "Pending"
+                              : "Active"}
                       </span>
                     </div>
                   </div>

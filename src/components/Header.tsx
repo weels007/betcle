@@ -4,14 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { clsx } from "clsx";
-import { TrendingUp, Plus, Trophy, User, Menu, X, Zap, Wallet, LogOut, Copy, Check } from "lucide-react";
+import { TrendingUp, Plus, Trophy, User, Menu, X, Wallet, LogOut, Copy, Check } from "lucide-react";
 import { useWallet } from "@/lib/WalletContext";
 
 const navItems = [
   { href: "/", label: "Home", icon: TrendingUp },
   { href: "/predictions", label: "Explore", icon: TrendingUp },
   { href: "/create", label: "Create", icon: Plus },
-  { href: "/instant-resolve", label: "Resolve", icon: Zap },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
   { href: "/profile", label: "Profile", icon: User },
 ];

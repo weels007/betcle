@@ -7,3 +7,16 @@ node_modules/
 .env.production.local
 *.tsbuildinfo
 next-env.d.ts
+
+# Python / contract tests
+__pycache__/
+*.pyc
+.pytest_cache/
+artifacts/
+.venv/
+venv/
+
+# Local-only test suite (kept out of the repo - run locally with pytest)
+tests/
+requirements.txt
+gltest.config.yaml

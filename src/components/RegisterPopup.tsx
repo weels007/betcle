@@ -96,9 +96,13 @@ export function RegisterPopup({ address, onRegistered, onClose }: RegisterPopupP
               onChange={(e) => setRegisterName(e.target.value)}
               placeholder="Enter your username"
               className="input-field flex-1"
+              maxLength={32}
               onKeyDown={(e) => e.key === "Enter" && register()}
             />
           </div>
+          <p className="text-xs text-gray-500 -mt-3 mb-6">
+            Username must be 1-32 characters
+          </p>
 
           <button
             onClick={register}
