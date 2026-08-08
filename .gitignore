@@ -15,8 +15,3 @@ __pycache__/
 artifacts/
 .venv/
 venv/
-
-# Local-only test suite (kept out of the repo - run locally with pytest)
-tests/
-requirements.txt
-gltest.config.yaml

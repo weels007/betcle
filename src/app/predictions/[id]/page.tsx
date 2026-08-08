@@ -36,6 +36,14 @@ interface Prediction {
   total_bets: string;
 }
 
+interface UserBet {
+  id: string;
+  prediction_id: string;
+  amount: string;
+  choice: string;
+  claimed: boolean;
+}
+
 export default function PredictionDetailPage({
   params,
 }: {
@@ -52,9 +60,7 @@ export default function PredictionDetailPage({
   const [isResolving, setIsResolving] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
   const [isRefunding, setIsRefunding] = useState(false);
-  const [hasBet, setHasBet] = useState(false);
-  const [userBetChoice, setUserBetChoice] = useState<string>("");
-  const [betClaimed, setBetClaimed] = useState(false);
+  const [userBets, setUserBets] = useState<UserBet[]>([]);
   const [consensusStatus, setConsensusStatus] = useState("");
 
   const mountedRef = useRef(true);
@@ -86,13 +92,12 @@ export default function PredictionDetailPage({
       });
 
       if (typeof betsResult === "string" && betsResult !== "") {
-        const bets = JSON.parse(betsResult);
-        const userBet = bets.find((bet: any) => bet.prediction_id === id);
-        if (userBet) {
-          setHasBet(true);
-          setUserBetChoice(userBet.choice);
-          setBetClaimed(userBet.claimed);
-        }
+        const allBets: UserBet[] = JSON.parse(betsResult);
+        // Aggregate ALL of this user's bets on this prediction — a user can
+        // hold multiple bets (including on both sides), and every contract-
+        // valid winning claim must be surfaced.
+        const myBets = allBets.filter((bet) => bet.prediction_id === id);
+        if (mountedRef.current) setUserBets(myBets);
       }
     } catch (error) {
       console.error("Failed to check user bet:", error);
@@ -249,21 +254,28 @@ export default function PredictionDetailPage({
         value: BigInt(0),
       });
 
-      toast.success("Claiming rewards...");
+      toast.success("Claim transaction submitted...");
 
-      // Try to wait for receipt, but don't fail if it times out
+      // Only treat the claim as successful once the receipt is confirmed.
+      // If confirmation throws, keep the action pending/failed and let the
+      // on-chain state decide — never mark it successful blindly.
       try {
         await client.waitForTransactionReceipt({
           hash: txHash,
         });
       } catch (e) {
-        console.log("Receipt wait timeout, proceeding...");
+        console.error("Receipt wait failed for claim:", e);
+        toast.error(
+          "Could not confirm the claim. If it succeeded in your wallet, refresh to update."
+        );
+        await checkUserBet();
+        return;
       }
 
-      // Mark as claimed immediately so button disappears
-      setBetClaimed(true);
+      // Success: refresh the real on-chain state (all winning bets claimed).
+      await checkUserBet();
+      await loadPrediction();
       toast.success("Rewards claimed!");
-      loadPrediction();
     } catch (error: any) {
       console.error("Failed to claim:", error);
       toast.error(error.message || "Failed to claim rewards");
@@ -292,19 +304,26 @@ export default function PredictionDetailPage({
         value: BigInt(0),
       });
 
-      toast.success("Refunding your stake...");
+      toast.success("Refund transaction submitted...");
 
+      // Only treat the refund as successful once the receipt is confirmed.
       try {
         await client.waitForTransactionReceipt({
           hash: txHash,
         });
       } catch (e) {
-        console.log("Receipt wait timeout, proceeding...");
+        console.error("Receipt wait failed for refund:", e);
+        toast.error(
+          "Could not confirm the refund. If it succeeded in your wallet, refresh to update."
+        );
+        await checkUserBet();
+        return;
       }
 
-      setBetClaimed(true);
+      // Success: refresh the real on-chain state (all bets refunded).
+      await checkUserBet();
+      await loadPrediction();
       toast.success("Stake refunded!");
-      loadPrediction();
     } catch (error: any) {
       console.error("Failed to refund:", error);
       toast.error(error.message || "Failed to refund stake");
@@ -354,6 +373,31 @@ export default function PredictionDetailPage({
   const total = totalYes + totalNo;
   const yesPercent = total > 0 ? (totalYes / total) * 100 : 50;
   const deadlinePassed = isDeadlinePassed(prediction.deadline);
+
+  // Aggregate ALL of the connected user's bets on this prediction so that
+  // every contract-valid winning claim is surfaced (a user can hold
+  // multiple bets, including on both sides).
+  const hasBet = userBets.length > 0;
+  const unclaimedBets = userBets.filter((bet) => !bet.claimed);
+  const hasUnclaimed = unclaimedBets.length > 0;
+  const unclaimedWinning = unclaimedBets.filter(
+    (bet) => prediction.resolved && bet.choice === prediction.result
+  );
+  const hasUnclaimedWinning = unclaimedWinning.length > 0;
+  const hasWinningSideBet = userBets.some(
+    (bet) => prediction.resolved && bet.choice === prediction.result
+  );
+  const unclaimedWinningCount = unclaimedWinning.length;
+  const totalStakeWei = userBets.reduce(
+    (sum, bet) => sum + parseInt(bet.amount || "0"),
+    0
+  );
+  const yesStakeWei = userBets
+    .filter((bet) => bet.choice === "yes")
+    .reduce((sum, bet) => sum + parseInt(bet.amount || "0"), 0);
+  const noStakeWei = userBets
+    .filter((bet) => bet.choice === "no")
+    .reduce((sum, bet) => sum + parseInt(bet.amount || "0"), 0);
 
   return (
     <div className="max-w-4xl mx-auto py-12">
@@ -590,7 +634,7 @@ export default function PredictionDetailPage({
       {prediction.resolved &&
         prediction.result === "inconclusive" &&
         hasBet &&
-        !betClaimed && (
+        hasUnclaimed && (
           <div className="glass-card rounded-3xl p-8 border border-gray-500/20">
             <div className="text-center">
               <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -599,11 +643,13 @@ export default function PredictionDetailPage({
               </h2>
               <p className="text-gray-400 mb-6">
                 AI validators could not determine a definitive outcome, so all
-                bets are refundable in full. You bet{" "}
+                of your{" "}
                 <span className="font-bold text-white">
-                  {userBetChoice.toUpperCase()}
-                </span>
-                .
+                  {formatGEN(String(totalStakeWei))} GEN
+                </span>{" "}
+                is refundable in full.
+                {yesStakeWei > 0 && ` (YES: ${formatGEN(String(yesStakeWei))})`}
+                {noStakeWei > 0 && ` (NO: ${formatGEN(String(noStakeWei))})`}
               </p>
               <button
                 onClick={refundBets}
@@ -630,7 +676,7 @@ export default function PredictionDetailPage({
       {prediction.resolved &&
         prediction.result === "inconclusive" &&
         hasBet &&
-        betClaimed && (
+        !hasUnclaimed && (
           <div className="glass-card rounded-3xl p-8">
             <div className="text-center">
               <CheckCircle className="w-12 h-12 text-teal-400 mx-auto mb-4" />
@@ -642,58 +688,74 @@ export default function PredictionDetailPage({
           </div>
         )}
 
-      {/* Claim Button - Only show if user has bet on this prediction */}
+      {/* Claim Button - shows while any winning bet remains unclaimed */}
       {prediction.resolved &&
         prediction.result !== "inconclusive" &&
         hasBet &&
-        !betClaimed && (
+        hasUnclaimedWinning && (
           <div className="glass-card rounded-3xl p-8">
             <div className="text-center">
               <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
               <h2 className="text-xl font-bold text-white mb-2">Resolved: {prediction.result.toUpperCase()}</h2>
               <p className="text-gray-400 mb-6">
-                You bet <span className={`font-bold ${userBetChoice === "yes" ? "text-green-400" : "text-red-400"}`}>{userBetChoice.toUpperCase()}</span>
-                {prediction.result === userBetChoice ? (
-                  <span className="text-green-400"> - You won!</span>
-                ) : (
-                  <span className="text-red-400"> - You lost</span>
-                )}
+                You have{" "}
+                <span className="font-bold text-green-400">
+                  {unclaimedWinningCount}{" "}
+                  {unclaimedWinningCount === 1 ? "winning bet" : "winning bets"}
+                </span>{" "}
+                still unclaimed
+                {yesStakeWei > 0 && ` (YES: ${formatGEN(String(yesStakeWei))} GEN)`}
+                {noStakeWei > 0 && ` (NO: ${formatGEN(String(noStakeWei))} GEN)`}.
               </p>
-              {prediction.result === userBetChoice && (
-                <button
-                  onClick={claimRewards}
-                  disabled={isClaiming}
-                  className="btn-primary"
-                >
-                  {isClaiming ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Claiming...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <Coins className="w-5 h-5" />
-                      Claim Rewards
-                    </span>
-                  )}
-                </button>
-              )}
+              <button
+                onClick={claimRewards}
+                disabled={isClaiming}
+                className="btn-primary"
+              >
+                {isClaiming ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Claiming...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Coins className="w-5 h-5" />
+                    Claim Rewards
+                  </span>
+                )}
+              </button>
             </div>
           </div>
         )}
 
-      {/* Already Claimed */}
+      {/* Resolved - no more winning claims available */}
       {prediction.resolved &&
         prediction.result !== "inconclusive" &&
         hasBet &&
-        betClaimed && (
+        !hasUnclaimedWinning && (
           <div className="glass-card rounded-3xl p-8">
             <div className="text-center">
-              <CheckCircle className="w-12 h-12 text-teal-400 mx-auto mb-4" />
-              <h2 className="text-xl font-bold text-white mb-2">Rewards Claimed!</h2>
-              <p className="text-gray-400">
-                You already claimed your rewards for this prediction.
-              </p>
+              {hasWinningSideBet ? (
+                <>
+                  <CheckCircle className="w-12 h-12 text-teal-400 mx-auto mb-4" />
+                  <h2 className="text-xl font-bold text-white mb-2">
+                    Rewards Claimed!
+                  </h2>
+                  <p className="text-gray-400">
+                    You claimed your rewards for this prediction.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+                  <h2 className="text-xl font-bold text-white mb-2">
+                    Resolved: {prediction.result.toUpperCase()}
+                  </h2>
+                  <p className="text-gray-400">
+                    You bet on the losing side — no rewards to claim.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         )}
